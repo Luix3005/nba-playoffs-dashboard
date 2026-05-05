@@ -115,9 +115,9 @@ nba-playoffs-dashboard/
 └── README.md                   # Documentação
 ```
 
-## 💼 Experiencia como Analista de Dados
+## 💼 Experiência como Analista de Dados
 
-Este projeto demonstra que eu domino:
+Este projeto demonstra praticas com:
 - ✅ Consumo de APIs REST públicas
 - ✅ Limpeza e transformação de dados (Pandas)
 - ✅ Análise estatística (correlação, agregações)
