@@ -115,7 +115,7 @@ nba-playoffs-dashboard/
 └── README.md                   # Documentação
 ```
 
-## 💼 Valor para Recrutadores
+## 💼 Experiencia como Analista de Dados
 
 Este projeto demonstra que eu domino:
 - ✅ Consumo de APIs REST públicas
