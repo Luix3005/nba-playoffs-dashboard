@@ -7,7 +7,7 @@
 
 ## 🎯 Objetivo
 
-Projeto de portfólio para demonstração de domínio do ciclo completo de dados (Extração → Limpeza → Análise → Visualização) para vagas de **Analista de Dados Júnior** ou **Engenharia de Software Júnior**.
+Projeto de portfólio para demonstração de domínio do ciclo completo de dados (Extração → Limpeza → Análise → Visualização) para vagas de **Analista de Dados Júnior**.
 
 ## 🤖 Automação e manutenção
 
