@@ -1,0 +1,7 @@
+streamlit>=1.35.0
+pandas>=2.2.2
+plotly>=5.22.0
+requests>=2.32.0
+# Optional dependencies
+# nba-api>=1.1.10  # Ativa dados oficiais da NBA quando instalado
+# playwright      # Usado por fetch_espn_data.py para scraping avançado
