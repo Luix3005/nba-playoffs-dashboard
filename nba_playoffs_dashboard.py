@@ -20,6 +20,7 @@ Instalação:
     streamlit run nba_playoffs_dashboard.py
 """
 
+import os
 import streamlit as st
 import pandas as pd
 import requests
@@ -43,6 +44,12 @@ try:
     NBA_API = True
 except ImportError:
     NBA_API = False
+
+try:
+    import praw
+    PRAW = True
+except ImportError:
+    PRAW = False
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ENDPOINTS — todos públicos, sem autenticação, sem custo
@@ -568,12 +575,39 @@ def bdl_jogos_recentes(team_ids: tuple, per_page: int = 10):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ░░  CAMADA 3 — Reddit r/nba (sem auth — JSON público)  ░░
+# ░░  CAMADA 3 — Reddit r/nba (com auth via PRAW e fallback público)  ░░
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@st.cache_data(ttl=300)
-def reddit_posts_top():
-    """Posts mais votados do dia em r/nba. Não requer autenticação."""
+
+def get_reddit_client():
+    if not PRAW:
+        return None
+
+    client_id = st.secrets.get("reddit_client_id", "") if hasattr(st, "secrets") else os.environ.get("REDDIT_CLIENT_ID", "")
+    client_secret = st.secrets.get("reddit_client_secret", "") if hasattr(st, "secrets") else os.environ.get("REDDIT_CLIENT_SECRET", "")
+    username = st.secrets.get("reddit_username", "") if hasattr(st, "secrets") else os.environ.get("REDDIT_USERNAME", "")
+    password = st.secrets.get("reddit_password", "") if hasattr(st, "secrets") else os.environ.get("REDDIT_PASSWORD", "")
+
+    if not all([client_id, client_secret, username, password]):
+        return None
+
+    try:
+        reddit = praw.Reddit(
+            client_id=client_id,
+            client_secret=client_secret,
+            username=username,
+            password=password,
+            user_agent=f"NBA Playoffs Dashboard by /u/{username}",
+        )
+        # verifica credenciais básicas
+        _ = reddit.user.me()
+        return reddit
+    except Exception:
+        return None
+
+
+def reddit_posts_public():
+    """Posts mais votados do dia em r/nba usando endpoints públicos."""
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
         "Accept": "application/json",
@@ -607,20 +641,62 @@ def reddit_posts_top():
 
 
 @st.cache_data(ttl=300)
+def reddit_posts_top():
+    """Posts mais votados do dia em r/nba."""
+    reddit = get_reddit_client()
+    posts = []
+    if reddit:
+        try:
+            for submission in reddit.subreddit("nba").top(time_filter="week", limit=30):
+                titulo = submission.title or ""
+                flair = getattr(submission, "link_flair_text", "") or ""
+                if any(kw in titulo.lower() for kw in ["game thread", "post game", "highlights", "analysis", "breakdown", "recap", "report", "trade", "injury", "signing", "update"]):
+                    posts.append({
+                        "titulo":    titulo,
+                        "url":       f"https://reddit.com{submission.permalink}",
+                        "score":     getattr(submission, "score", 0) or 0,
+                        "flair":     flair,
+                        "body":      (getattr(submission, "selftext", "") or "")[:500],
+                        "comments":  getattr(submission, "num_comments", 0) or 0,
+                        "autor":      str(getattr(submission, "author", "")),
+                    })
+            if posts:
+                return sorted(posts, key=lambda x: x["score"], reverse=True)[:3]
+        except Exception:
+            pass
+
+    return reddit_posts_public()
+
+
+@st.cache_data(ttl=300)
 def reddit_buscar_jogo(home_nome: str, away_nome: str):
     """Busca post-game thread no Reddit para um jogo específico."""
+    reddit = get_reddit_client()
+    h = home_nome.split()[-1] if home_nome else ""
+    a = away_nome.split()[-1] if away_nome else ""
+    if reddit:
+        try:
+            query = f"{h} vs {a} recap"
+            results = []
+            for submission in reddit.subreddit("nba").search(query, sort="relevance", limit=5):
+                results.append({
+                    "title": submission.title or "",
+                    "permalink": f"https://reddit.com{submission.permalink}",
+                })
+            if results:
+                return results
+        except Exception:
+            pass
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
         "Accept": "application/json",
     }
-    h = home_nome.split()[-1] if home_nome else ""
-    a = away_nome.split()[-1] if away_nome else ""
-    queries = [
+    for q in [
         f"Post Game Thread {h} {a}",
         f"Game Thread {h} {a}",
         f"{h} vs {a} recap",
-    ]
-    for q in queries:
+    ]:
         params = {
             "q": q,
             "restrict_sr": "true",
@@ -635,7 +711,11 @@ def reddit_buscar_jogo(home_nome: str, away_nome: str):
             continue
         children = data.get("data", {}).get("children", [])
         if children:
-            return [c.get("data", {}) for c in children[:3]]
+            return [
+                {"title": c.get("data", {}).get("title", ""),
+                 "permalink": f"https://reddit.com{c.get('data', {}).get('permalink', '')}"}
+                for c in children[:3]
+            ]
     return []
 
 
