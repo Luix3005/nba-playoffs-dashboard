@@ -21,6 +21,7 @@ Instalação:
 """
 
 import os
+import json
 import streamlit as st
 import pandas as pd
 import requests
@@ -127,8 +128,31 @@ BDL_SEASON    = "https://www.balldontlie.io/api/v1/season_averages"
 REDDIT_NBA    = "https://www.reddit.com/r/nba/search.json"
 REDDIT_TOP    = "https://www.reddit.com/r/nba/top.json?t=week&limit=10"
 REDDIT_HOT    = "https://www.reddit.com/r/nba/hot.json?limit=10"
+REDDIT_CACHE_FILE = os.path.join(os.path.dirname(__file__), "reddit_cache.json")
 
 TIMEOUT = 10
+
+
+def load_reddit_cache():
+    try:
+        if os.path.exists(REDDIT_CACHE_FILE):
+            with open(REDDIT_CACHE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+    except Exception:
+        pass
+    return []
+
+
+def save_reddit_cache(posts):
+    try:
+        if not isinstance(posts, list):
+            return
+        with open(REDDIT_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(posts, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REFERÊNCIA CPI
@@ -637,7 +661,10 @@ def reddit_posts_public():
         if p["titulo"] not in seen:
             seen.add(p["titulo"])
             unique.append(p)
-    return sorted(unique, key=lambda x: x["score"], reverse=True)[:3]
+    result = sorted(unique, key=lambda x: x["score"], reverse=True)[:3]
+    if result:
+        save_reddit_cache(result)
+    return result
 
 
 @st.cache_data(ttl=300)
@@ -645,6 +672,7 @@ def reddit_posts_top():
     """Posts mais votados do dia em r/nba."""
     reddit = get_reddit_client()
     posts = []
+    source = "live"
     if reddit:
         try:
             for submission in reddit.subreddit("nba").top(time_filter="week", limit=30):
@@ -661,11 +689,21 @@ def reddit_posts_top():
                         "autor":      str(getattr(submission, "author", "")),
                     })
             if posts:
-                return sorted(posts, key=lambda x: x["score"], reverse=True)[:3]
+                result = sorted(posts, key=lambda x: x["score"], reverse=True)[:3]
+                save_reddit_cache(result)
+                return result, source
         except Exception:
             pass
 
-    return reddit_posts_public()
+    public_posts = reddit_posts_public()
+    if public_posts:
+        return public_posts, source
+
+    cached = load_reddit_cache()
+    if cached:
+        return cached, "cache"
+
+    return [], source
 
 
 @st.cache_data(ttl=300)
@@ -1604,7 +1642,7 @@ def main():
             injuries     = espn_lesoes()
             noticias_raw = espn_noticias()
             players      = nba_api_players()
-            reddit_posts = reddit_posts_top()
+            reddit_posts, reddit_source = reddit_posts_top()
 
     # Status das fontes — sem ternário inline (evita bug DeltaGenerator)
     st.sidebar.divider()
@@ -1618,7 +1656,10 @@ def main():
     else:
         st.sidebar.info("ℹ️ NBA API: fallback local")
     if reddit_posts:
-        st.sidebar.success(f"✅ Reddit r/nba ({len(reddit_posts)} posts)")
+        if reddit_source == "cache":
+            st.sidebar.info(f"ℹ️ Reddit off-line — exibindo cache ({len(reddit_posts)} posts)")
+        else:
+            st.sidebar.success(f"✅ Reddit r/nba ({len(reddit_posts)} posts)")
     else:
         st.sidebar.warning("⚠️ Reddit indisponível")
     st.sidebar.caption(f"🕐 {datetime.now().strftime('%d/%m/%Y %H:%M')}")
@@ -1659,6 +1700,8 @@ def main():
             " Dados ao vivo · Comentários automáticos",
             unsafe_allow_html=True
         )
+        if reddit_source == "cache":
+            st.info("🔄 Reddit off-line no momento — exibindo posts em cache.")
 
         # Jogos de hoje
         playoff_hoje = [g for g in today_games if g.get("playoff")]
@@ -1905,6 +1948,8 @@ def main():
     elif page == "💬 Reddit r/nba":
         st.header("💬 Reddit r/nba — Em Alta Hoje")
         st.caption("Fonte: Reddit API pública · Posts top do dia/semana · Game Threads + Análises")
+        if reddit_source == "cache":
+            st.info("🔄 Reddit off-line no momento — exibindo posts em cache.")
 
         if not reddit_posts:
             st.warning("Reddit API indisponível ou sem posts relevantes no momento.")
