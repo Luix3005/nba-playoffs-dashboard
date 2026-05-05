@@ -104,7 +104,8 @@ TIMEOUT = 10
 
 def fetch_json(url, params=None, headers=None, timeout=TIMEOUT):
     try:
-        r = SESSION.get(url, params=params, timeout=timeout, headers=headers or HEADERS)
+        merged_headers = {**HEADERS, **(headers or {})}
+        r = SESSION.get(url, params=params, timeout=timeout, headers=merged_headers)
         if r.status_code == 200:
             return r.json()
     except Exception:
@@ -573,7 +574,10 @@ def bdl_jogos_recentes(team_ids: tuple, per_page: int = 10):
 @st.cache_data(ttl=300)
 def reddit_posts_top():
     """Posts mais votados do dia em r/nba. Não requer autenticação."""
-    headers = {"User-Agent": "NBADashboard/1.0 (hobby project)"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+        "Accept": "application/json",
+    }
     posts = []
     for url in [REDDIT_TOP, REDDIT_HOT]:
         data = fetch_json(url, headers=headers)
@@ -605,7 +609,10 @@ def reddit_posts_top():
 @st.cache_data(ttl=300)
 def reddit_buscar_jogo(home_nome: str, away_nome: str):
     """Busca post-game thread no Reddit para um jogo específico."""
-    headers = {"User-Agent": "NBADashboard/1.0 (hobby project)"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+        "Accept": "application/json",
+    }
     h = home_nome.split()[-1] if home_nome else ""
     a = away_nome.split()[-1] if away_nome else ""
     queries = [
@@ -1535,6 +1542,15 @@ def main():
     else:
         st.sidebar.warning("⚠️ Reddit indisponível")
     st.sidebar.caption(f"🕐 {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+    # Aviso de fontes indisponíveis no corpo principal do app
+    if not series_map and not today_games and not noticias_raw:
+        st.warning(
+            "Nenhuma fonte principal foi carregada. "
+            "O app continua disponível, mas alguns cards podem ficar vazios. "
+            "Tente atualizar ou aguarde alguns minutos."
+        )
+
     if st.sidebar.button("🔄 Atualizar tudo"):
         st.cache_data.clear()
         st.rerun()
