@@ -44,11 +44,20 @@ Dashboard web desenvolvido em Streamlit que:
 - **NBA API oficial** opcional via `nba_api` para estatísticas de jogadores quando disponível
 - **Fallback multi-fonte** para manter o dashboard resiliente mesmo quando alguma API falhar
 
+## 📸 Capturas do Dashboard
+
+![Visão Geral](assets/visao-geral.png)
+![Brackets e Séries](assets/brackets-series.png)
+![Análise de Jogador](assets/analise-jogador.png)
+![Jogos de Hoje](assets/jogos-hoje.png)
+![Painel de Jogadores](assets/painel-jogadores.png)
+![Reddit NBA](assets/reddit-nba.png)
+
 ## 🚀 Como Rodar
 
 ```bash
 # 1. Clone o repositório
-git clone https://github.com/seu-usuario/nba-playoffs-dashboard.git
+git clone https://github.com/Luix3005/nba-playoffs-dashboard.git
 cd nba-playoffs-dashboard
 
 # 2. Instale as dependências
